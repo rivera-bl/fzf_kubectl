@@ -7,7 +7,6 @@
 # --bind 'ctrl-r:reload:kubectl get pod --all-namespaces' \
 # --header $'| ctrl-v:events | ctrl-s:describe | ctrl-l:logs | ctrl-e:edit | ctrl-f:follow |\n\n' \
 # --bind 'ctrl-h:preview:echo "ctrl-v: events\nctrl-s: describe\nctrl-l: logs\nctrl-e: edit\nctrl-f: follow" | bat --plain -l yaml' \
-# --preview "kubectl get event --namespace {1} --field-selector involvedObject.name={2} | sed -e '1s/LAST SEEN/SEEN/' | awk '{\$4=\"\"; \$5 = \"\t\" \$5; \$1 = \"\t\" \$1; \$2 = \"\t\" \$2; \$3 = \"\t\" \$3; print \$0;}' | column -t -s \$'\t' | sed '1{H;1h;\$!d;\${g;q;};};\$G' | tac | bat --plain --color=always -l fstab" "$@" \
 # TODO toggle previews, start hidden
 # logs
 # events
@@ -26,6 +25,7 @@ function _fzf_kubectl_entry_pod() {
       --bind 'ctrl-r:execute(sh fzf_kubectl _fzf_kubectl_action_restart_deploy {1} {2})+reload(kubectl get pod -A)' \
       --bind 'ctrl-d:execute-multi(sh fzf_kubectl _fzf_kubectl_action_delete {1} {2})+reload(kubectl get pod -A)' \
         --bind 'ctrl-v:change-preview(sh fzf_kubectl _fzf_kubectl_preview_events {1},{2})' \
+        --bind 'ctrl-s:change-preview(sh fzf_kubectl _fzf_kubectl_preview_describe {1},{2})' \
     --preview-window right,60%
 }
 
@@ -33,8 +33,8 @@ function _fzf_kubectl_entry_pod() {
 ### ACTION
 #####################
 
-# --bind 'ctrl-d:execute-multi(kubectl delete pod --namespace {1} {2} --force)+reload(kubectl get pod --all-namespaces)+abort' \
 # TODO fix errors related to execute-multi
+# --bind 'ctrl-d:execute-multi(kubectl delete pod --namespace {1} {2} --force)+reload(kubectl get pod --all-namespaces)+abort' \
 function _fzf_kubectl_action_delete(){
   kubectl delete pod -n $@ --force
   sleep 10s
@@ -69,26 +69,12 @@ function _fzf_kubectl_preview_events(){
     tac | bat --plain --color=always -l fstab
 }
 
-# --bind 'ctrl-s:preview:kubectl describe pod --namespace {1} {2} | bat --color=always -l yaml' "$@" \
 function _fzf_kubectl_preview_describe(){
-  args=$(_fzf_to_array $@)
-  kubectl describe pod args[1] --namespace args[0] | \
+  IFS=',' read -r -a array <<< "$@"
+  kubectl describe pod "${array[1]}" --namespace "${array[0]}" | \
     bat --color=always -l yaml
 }
 
 # --bind 'ctrl-l:preview:kubectl logs --all-containers --tail=10000 --namespace {1} {2} | tac' "$@" \
 
 $@
-
-#####################
-### GLOBALS (functions to be defined shell-wide)
-#####################
-
-# TODO 
-# use awk to split an argument $@ separated by ',', for infinite ammount of arguments
-# call it by index, ej: _fzf_to_array[0]
-# function _fzf_to_array(){
-#   # get the index
-#   # first=($(awk -F ',' '{print $1}' <<< $@))
-#   # second=($(awk -F ',' '{print $2}' <<< $@))
-# }
