@@ -7,10 +7,7 @@
 # --bind 'ctrl-r:reload:kubectl get pod --all-namespaces' \
 # --header $'| ctrl-v:events | ctrl-s:describe | ctrl-l:logs | ctrl-e:edit | ctrl-f:follow |\n\n' \
 # --bind 'ctrl-h:preview:echo "ctrl-v: events\nctrl-s: describe\nctrl-l: logs\nctrl-e: edit\nctrl-f: follow" | bat --plain -l yaml' \
-# TODO toggle previews, start hidden
-# logs
-# events
-# describe
+# TODO set different preview positions per bind, for ex logs should go bottom
 # --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
 function _fzf_kubectl_entry_pod() {
   FZF_DEFAULT_COMMAND="kubectl get pod --all-namespaces" \
@@ -26,6 +23,7 @@ function _fzf_kubectl_entry_pod() {
       --bind 'ctrl-d:execute-multi(sh fzf_kubectl _fzf_kubectl_action_delete {1} {2})+reload(kubectl get pod -A)' \
         --bind 'ctrl-v:change-preview(sh fzf_kubectl _fzf_kubectl_preview_events {1},{2})' \
         --bind 'ctrl-s:change-preview(sh fzf_kubectl _fzf_kubectl_preview_describe {1},{2})' \
+        --bind 'ctrl-l:change-preview(sh fzf_kubectl _fzf_kubectl_preview_logs {1},{2})' \
     --preview-window right,60%
 }
 
@@ -75,6 +73,10 @@ function _fzf_kubectl_preview_describe(){
     bat --color=always -l yaml
 }
 
-# --bind 'ctrl-l:preview:kubectl logs --all-containers --tail=10000 --namespace {1} {2} | tac' "$@" \
+function _fzf_kubectl_preview_logs(){
+  IFS=',' read -r -a array <<< "$@"
+  kubectl logs --all-containers --tail=10000 --namespace ${array[0]} ${array[1]} | \
+    tac
+}
 
 $@
