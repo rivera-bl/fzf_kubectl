@@ -3,11 +3,17 @@
 #####################
 ### ENTRY
 #####################
+
 # --bind 'ctrl-r:reload:kubectl get pod --all-namespaces' \
 # --header $'| ctrl-v:events | ctrl-s:describe | ctrl-l:logs | ctrl-e:edit | ctrl-f:follow |\n\n' \
 # --bind 'ctrl-h:preview:echo "ctrl-v: events\nctrl-s: describe\nctrl-l: logs\nctrl-e: edit\nctrl-f: follow" | bat --plain -l yaml' \
 # --preview "kubectl get event --namespace {1} --field-selector involvedObject.name={2} | sed -e '1s/LAST SEEN/SEEN/' | awk '{\$4=\"\"; \$5 = \"\t\" \$5; \$1 = \"\t\" \$1; \$2 = \"\t\" \$2; \$3 = \"\t\" \$3; print \$0;}' | column -t -s \$'\t' | sed '1{H;1h;\$!d;\${g;q;};};\$G' | tac | bat --plain --color=always -l fstab" "$@" \
-function fzf_kubectl_entry_pod() {
+# TODO toggle previews, start hidden
+# logs
+# events
+# describe
+# --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
+function _fzf_kubectl_entry_pod() {
   FZF_DEFAULT_COMMAND="kubectl get pod --all-namespaces" \
   fzf \
     --multi \
@@ -15,11 +21,11 @@ function fzf_kubectl_entry_pod() {
     --header-lines=1 \
     --info=inline \
     --layout=reverse \
-    --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
-      --bind 'enter:execute(sh fzf_kubectl fzf_kubectl_action_exec {1} {2})+abort' \
-      --bind 'ctrl-f:execute(sh fzf_kubectl fzf_kubectl_action_logs {1} {2})+abort' \
-      --bind 'ctrl-o:execute(sh fzf_kubectl fzf_kubectl_action_restart_deploy {1} {2})+reload(kubectl get pod -A)' \
-      --bind 'ctrl-d:execute-multi(sh fzf_kubectl fzf_kubectl_action_delete {1} {2})+reload(kubectl get pod -A)' \
+      --bind 'enter:execute(sh fzf_kubectl _fzf_kubectl_action_exec {1} {2})+abort' \
+      --bind 'ctrl-f:execute(sh fzf_kubectl _fzf_kubectl_action_logs {1} {2})+abort' \
+      --bind 'ctrl-r:execute(sh fzf_kubectl _fzf_kubectl_action_restart_deploy {1} {2})+reload(kubectl get pod -A)' \
+      --bind 'ctrl-d:execute-multi(sh fzf_kubectl _fzf_kubectl_action_delete {1} {2})+reload(kubectl get pod -A)' \
+        --bind 'ctrl-v:change-preview(sh fzf_kubectl _fzf_kubectl_preview_events {1},{2})' \
     --preview-window right,60%
 }
 
@@ -29,20 +35,20 @@ function fzf_kubectl_entry_pod() {
 
 # --bind 'ctrl-d:execute-multi(kubectl delete pod --namespace {1} {2} --force)+reload(kubectl get pod --all-namespaces)+abort' \
 # TODO fix errors related to execute-multi
-function fzf_kubectl_action_delete(){
+function _fzf_kubectl_action_delete(){
   kubectl delete pod -n $@ --force
   sleep 10s
 }
 
-function fzf_kubectl_action_exec(){
+function _fzf_kubectl_action_exec(){
   kubectl exec -it --namespace $@ -- bash || kubectl exec -it --namespace $@ -- sh
 }
 
-function fzf_kubectl_action_restart_deploy(){
+function _fzf_kubectl_action_restart_deploy(){
   kubectl rollout restart deployment --namespace $1 $(echo $2 | rev | cut -f3- -d '-' | rev)
 }
 
-function fzf_kubectl_action_logs(){
+function _fzf_kubectl_action_logs(){
   DEPLOYMENT_NAME=$(kubectl get pod --namespace $@ -o json | jq -r ".metadata.ownerReferences[].name")
   tmux setenv FZF_KUBECTL_STERN $DEPLOYMENT_NAME
   tmux send-keys "stern $(tmux showenv | grep '^FZF_KUBECTL_STERN'| awk -F '=' '{print $2}') -n $1" Enter
@@ -52,8 +58,37 @@ function fzf_kubectl_action_logs(){
 ### PREVIEW
 #####################
 
+# TODO fix formatting of column items
+# awk '{\$4=\"\"; \$5 = \"\t\" \$5; \$1 = \"\t\" \$1; \$2 = \"\t\" \$2; \$3 = \"\t\" \$3; print \$0;}'
+function _fzf_kubectl_preview_events(){
+  first=($(awk -F ',' '{print $1}' <<< $@))
+  second=($(awk -F ',' '{print $2}' <<< $@))
+  kubectl get event --namespace $first --field-selector involvedObject.name=$second | \
+    sed -e "1s/LAST SEEN/SEEN/" | \
+    sed "1{H;1h;\$!d;\${g;q;};};\$G" | \
+    tac | bat --plain --color=always -l fstab
+}
+
 # --bind 'ctrl-s:preview:kubectl describe pod --namespace {1} {2} | bat --color=always -l yaml' "$@" \
+function _fzf_kubectl_preview_describe(){
+  args=$(_fzf_to_array $@)
+  kubectl describe pod args[1] --namespace args[0] | \
+    bat --color=always -l yaml
+}
+
 # --bind 'ctrl-l:preview:kubectl logs --all-containers --tail=10000 --namespace {1} {2} | tac' "$@" \
-# --bind "ctrl-v:preview:kubectl get event --namespace {1} --field-selector involvedObject.name={2} | sed -e '1s/LAST SEEN/SEEN/' | awk '{\$4=\"\"; \$5 = \"\t\" \$5; \$1 = \"\t\" \$1; \$2 = \"\t\" \$2; \$3 = \"\t\" \$3; print \$0;}' | column -t -s \$'\t' | sed '1{H;1h;\$!d;\${g;q;};};\$G' | tac | bat --plain --color=always -l fstab" "$@" \
 
 $@
+
+#####################
+### GLOBALS (functions to be defined shell-wide)
+#####################
+
+# TODO 
+# use awk to split an argument $@ separated by ',', for infinite ammount of arguments
+# call it by index, ej: _fzf_to_array[0]
+# function _fzf_to_array(){
+#   # get the index
+#   # first=($(awk -F ',' '{print $1}' <<< $@))
+#   # second=($(awk -F ',' '{print $2}' <<< $@))
+# }
