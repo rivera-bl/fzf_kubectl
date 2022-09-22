@@ -4,6 +4,7 @@
 ### ENTRY
 #####################
 
+# TODO change preview position per binding
 function _fzf_kubectl_entry_pod() {
   FZF_DEFAULT_COMMAND="kubectl get pod --all-namespaces" \
   fzf \
@@ -20,9 +21,11 @@ function _fzf_kubectl_entry_pod() {
         --bind 'ctrl-v:change-preview(sh fzf_kubectl _fzf_kubectl_preview_events {1},{2})' \
         --bind 'ctrl-s:change-preview(sh fzf_kubectl _fzf_kubectl_preview_describe {1},{2})' \
         --bind 'ctrl-l:change-preview(sh fzf_kubectl _fzf_kubectl_preview_logs {1},{2})' \
-        --bind '?:preview(sh fzf_kubectl _fzf_kubectl_help_pod)' \
-        --bind '!:reload(kubectl get pod -A)' \
-    --preview-window right,60%
+          --bind '?:preview(sh fzf_kubectl _fzf_kubectl_help_pod)' \
+          --bind '!:reload(kubectl get pod -A)' \
+          --bind 'ctrl-space:toggle-preview' \
+    --preview-window right,hidden,60% \
+    --preview 'sh fzf_kubectl _fzf_kubectl_help_pod'
 }
 
 #####################
@@ -41,6 +44,7 @@ function _fzf_kubectl_pod_exec(){
 }
 
 function _fzf_kubectl_pod_restart_deploy(){
+  tmux send-keys "$2"
   kubectl rollout restart deployment --namespace $1 $(echo $2 | rev | cut -f3- -d '-' | rev)
 }
 
