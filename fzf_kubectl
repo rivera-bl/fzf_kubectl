@@ -9,7 +9,7 @@ REGISTRY="$(awk -F '_' '{print $1}' <<< $AWS_PROFILE).dkr.ecr.$AWS_REGION.amazon
 
 # TODO change preview position per binding
 function _fzf_kubectl_entry_pod() {
-  FZF_DEFAULT_COMMAND="kubectl get pod --all-namespaces" \
+  FZF_DEFAULT_COMMAND="kubectl get pod --all-namespaces || kubectl get pod" \
   fzf \
     --multi \
     --height 99% \
@@ -17,7 +17,7 @@ function _fzf_kubectl_entry_pod() {
     --info=inline \
     --layout=reverse \
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
-      --bind 'enter:execute(sh fzf_kubectl _fzf_kubectl_pod_exec {1} {2})+abort' \
+      --bind 'enter:execute(sh fzf_kubectl _fzf_kubectl_pod_exec {1},{2})+abort' \
       --bind 'ctrl-f:execute(sh fzf_kubectl _fzf_kubectl_pod_logs {1} {2})+abort' \
       --bind 'ctrl-r:execute(sh fzf_kubectl _fzf_kubectl_pod_restart_deploy {1} {2})+reload(kubectl get pod -A)' \
       --bind 'ctrl-b:execute(sh fzf_kubectl _fzf_kubectl_pod_debug {1},{2})+clear-query+reload(sh fzf_kubectl _fzf_kubectl_tags_registry)' \
