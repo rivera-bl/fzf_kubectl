@@ -43,7 +43,7 @@ function _fzf_kubectl_pod_delete(){
   sleep 10s
 }
 
-# NOTE debug action here to reuse the --bind enter:
+# NOTE using debug action here to reuse the --bind enter:
 function _fzf_kubectl_pod_exec(){
   IFS=',' read -r -a array <<< "$@"
   export $(tmux showenv | grep '^FZF_KUBECTL_DEBUG')
@@ -70,6 +70,7 @@ function _fzf_kubectl_pod_logs(){
   tmux send-keys "stern $(tmux showenv | grep '^FZF_KUBECTL_STERN'| awk -F '=' '{print $2}') -n $1" Enter
 }
 
+# TODO change prompt to 'Enter: select image to debug {pod} -n {namespace}'
 function _fzf_kubectl_pod_debug(){
   IFS=',' read -r -a array <<< "$@"
   tmux setenv FZF_KUBECTL_DEBUG true
