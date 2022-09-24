@@ -9,7 +9,10 @@ REGISTRY="$(awk -F '_' '{print $1}' <<< $AWS_PROFILE).dkr.ecr.$AWS_REGION.amazon
 ### ENTRY
 #####################
 
-# TODO fix preview not working for not -A
+# TODO fix commands that use {1} namespace by adding the column to the ouput of unprivileged
+# use custom columns to add the namespace column
+# downside will have to pass every column explicitly
+# kubectl get pod -o=custom-columns=NAMESPACE:.metadata.namespace
 function _fzf_kubectl_entry_pvc() {
   FZF_DEFAULT_COMMAND="kubectl get pvc -A 2>/dev/null || kubectl get pvc" \
   fzf \
@@ -23,11 +26,9 @@ function _fzf_kubectl_entry_pvc() {
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,50% \
     --preview 'kubectl describe pvc --namespace {1} {2} | bat -l yaml' "$@" 
-
 }
 
 # TODO fix preview for not -A
-# pass {4},{5} use array item based if first column name is NAMESPACE
 function _fzf_kubectl_entry_event(){
   _fzf_kubectl_event_command | fzf \
     --height 99% \
