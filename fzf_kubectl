@@ -24,10 +24,18 @@ function _fzf_kubectl_entry_pvc() {
 
 }
 
-# TODO show all events or namespaced events if non-zero exit
+function _fzf_kubectl_event_command(){
+  UNPRIVILEGED="CMA0564-k8sqacl02"
+  CURRENT_CONTEXT=$(kubectl config current-context | sed 's/-cluster$//')
+  if [[ $CURRENT_CONTEXT == $UNPRIVILEGED ]]; then
+    kubectl get event --sort-by=.metadata.creationTimestamp | sort -k1 -n
+  else
+    kubectl get event -A --sort-by=.metadata.creationTimestamp | sort -k2 -n
+  fi
+}
+
 function _fzf_kubectl_entry_event(){
-  FZF_DEFAULT_COMMAND="kubectl get event --sort-by=.metadata.creationTimestamp | sort -k1 -n" \
-  fzf \
+  _fzf_kubectl_event_command | fzf \
     --height 99% \
     --header-lines=1 \
     --info=inline \
