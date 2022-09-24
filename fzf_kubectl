@@ -4,18 +4,16 @@ AWS_REGION="us-east-1"
 REGISTRY="$(awk -F '_' '{print $1}' <<< $AWS_PROFILE).dkr.ecr.$AWS_REGION.amazonaws.com"
 
 # TODO add action secret_decode
-# TODO make compatible with unprivileged clusters (single namespaced)
-# fix commands that use {1} namespace by adding the column to the ouput of unprivileged
-# use custom columns to add the namespace column
-# downside will have to pass every column explicitly
-# kubectl get pod -o=custom-columns=NAMESPACE:.metadata.namespace
-
+# TODO complete formating of custom-columns
 #####################
 ### ENTRY
 #####################
 
+# TODO fix custom-columns port,age
 function _fzf_kubectl_entry_svc(){
-  FZF_DEFAULT_COMMAND="kubectl get svc -A || kubectl get svc" \
+  UNPRIVILEGED="kubectl get svc \
+    -o=custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.type,CLUSTER-IP:.spec.clusterIP,PORT(S):.spec.ports[].port'"
+  FZF_DEFAULT_COMMAND="kubectl get svc -A || $UNPRIVILEGED" \
   fzf \
     --header-lines=1 \
     --info=inline \
@@ -29,8 +27,11 @@ function _fzf_kubectl_entry_svc(){
     --preview 'kubectl get svc --namespace {1} {2} -o yaml | bat -l yaml' "$@"
 }
 
+# TODO fix custom-columns data,age
 function _fzf_kubectl_entry_secret(){
-  FZF_DEFAULT_COMMAND="kubectl get secrets -A || kubectl get secrets" \
+  UNPRIVILEGED="kubectl get secrets \
+    -o=custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,TYPE:.type'"
+  FZF_DEFAULT_COMMAND="kubectl get secrets -A 2>/dev/null || $UNPRIVILEGED" \
   fzf \
     --header-lines=1 \
     --info=inline \
@@ -44,8 +45,17 @@ function _fzf_kubectl_entry_secret(){
     --preview 'kubectl get secret --namespace {1} {2} -o json | bat --wrap auto --style=numbers --color=always -l json' "$@"
 }
 
+# TODO fix custom-columns volume,capacity,access,age
+# VOLUME:.spec.resources.requests.storage,\
+# ACCESS MODES:.spec.accessModes[],\
 function _fzf_kubectl_entry_pvc() {
-  FZF_DEFAULT_COMMAND="kubectl get pvc -A 2>/dev/null || kubectl get pvc" \
+  UNPRIVILEGED="kubectl get pvc \
+    -o=custom-columns='\
+NAMESPACE:.metadata.namespace,\
+NAME:.metadata.name,\
+STATUS:.status.phase,\
+STORAGECLASS:spec.storageClassName'"
+  FZF_DEFAULT_COMMAND="kubectl get pvc -A 2>/dev/null || $UNPRIVILEGED" \
   fzf \
     --height 80% \
     --header-lines=1 \
@@ -73,7 +83,16 @@ function _fzf_kubectl_entry_event(){
 
 # TODO change preview position per binding
 function _fzf_kubectl_entry_pod() {
-  FZF_DEFAULT_COMMAND="kubectl get pod --all-namespaces || kubectl get pod" \
+  UNPRIVILEGED="kubectl get pod \
+    -o=custom-columns='\
+NAMESPACE:.metadata.namespace,\
+NAME:.metadata.name,\
+READY:.status.containerStatuses[].ready,\
+STATUS:.status.containerStatuses[].state.*.reason,\
+RESTARTS:.status.containerStatuses[].restartCount'"
+  FZF_DEFAULT_COMMAND="
+    kubectl get pod --all-namespaces 2>/dev/null || \
+    $UNPRIVILEGED" \
   fzf \
     --multi \
     --height 99% \
