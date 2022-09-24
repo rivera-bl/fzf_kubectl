@@ -7,6 +7,34 @@ REGISTRY="$(awk -F '_' '{print $1}' <<< $AWS_PROFILE).dkr.ecr.$AWS_REGION.amazon
 ### ENTRY
 #####################
 
+# TODO fix action _pvc_inspect
+function _fzf_kubectl_entry_pvc() {
+  FZF_DEFAULT_COMMAND="kubectl get pvc -A 2>/dev/null || kubectl get pvc" \
+  fzf \
+    --height 80% \
+    --header-lines=1 \
+    --info=inline \
+    --layout=reverse \
+    --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
+    --header $'| Enter (mount on temporary pod pvc-inspector) |\n\n' \
+		  --bind 'enter:execute(sh fzf_kubectl _fzf_kubectl_pvc_inspect)+abort' "$@" \
+      --bind 'ctrl-space:toggle-preview' \
+    --preview-window right,hidden,50% \
+    --preview 'kubectl describe pvc --namespace {1} {2} | bat -l yaml' "$@" 
+
+}
+
+# TODO show all events or namespaced events if non-zero exit
+function _fzf_kubectl_entry_event(){
+  FZF_DEFAULT_COMMAND="kubectl get event --sort-by=.metadata.creationTimestamp | sort -k1 -n" \
+  fzf \
+    --height 99% \
+    --header-lines=1 \
+    --info=inline \
+    --layout=reverse \
+  --prompt "$(kubectl config current-context | sed 's/-cluster$//')> "
+}
+
 # TODO change preview position per binding
 function _fzf_kubectl_entry_pod() {
   FZF_DEFAULT_COMMAND="kubectl get pod --all-namespaces || kubectl get pod" \
@@ -35,6 +63,33 @@ function _fzf_kubectl_entry_pod() {
 #####################
 ### ACTION
 #####################
+
+function _fzf_kubectl_pvc_inspect(){
+  IFS=',' read -r -a array <<< "$@"
+  cat <<EOF | kubectl apply -f -
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: pvc-inspector
+      namespace: $(kubectl get ns)
+    spec:
+      containers:
+      - image: busybox
+        name: pvc-inspector
+        command: ["tail"]
+        args: ["-f", "/dev/null"]
+        volumeMounts:
+        - mountPath: /pvc
+          name: pvc-mount
+          readOnly: true
+      volumes:
+      - name: pvc-mount
+        persistentVolumeClaim:
+          claimName: {2}
+EOF
+  sleep 5s && kubectl exec -ti pvc-inspector -n {1} -- sh -c "cd /pvc && /bin/sh"
+  kubectl delete pod pvc-inspector -n {1} --force
+}
 
 # TODO fix errors related to execute-multi
 # --bind 'ctrl-d:execute-multi(kubectl delete pod --namespace {1} {2} --force)+reload(kubectl get pod --all-namespaces)+abort' \
