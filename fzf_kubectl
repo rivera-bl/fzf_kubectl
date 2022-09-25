@@ -9,8 +9,37 @@ REGISTRY="$(awk -F '_' '{print $1}' <<< $AWS_PROFILE).dkr.ecr.$AWS_REGION.amazon
 ### ENTRY
 #####################
 
+# TODO customize like fzf_images
+function _menu(){
+  vals=("pod" "service" "event" "pvc" "secret")
+  selection=$(printf "%s\n" "${vals[@]}" | fzf-tmux -p)
+  case $selection in
+  "pod")
+     func="_entry_pod"
+     ;;
+  "service")
+     func="_entry_svc"
+     ;;
+  "event")
+     func="_entry_event"
+     ;;
+  "pvc")
+     func="_entry_event"
+     ;;
+  "secret")
+     func="_entry_secret"
+     ;;
+  esac
+  if [ ! -z "$selection" ]; then
+    export func=$func
+    # tmux split-window -h
+    tmux neww zsh -c "source ~/code/github/fzf_kubectl/fzf_kubectl; $func"
+    unset func
+  fi
+}
+
 # TODO fix custom-columns port,age
-function _fzf_kubectl_entry_svc(){
+function _entry_svc(){
   UNPRIVILEGED="kubectl get svc \
     -o=custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.type,CLUSTER-IP:.spec.clusterIP,PORT(S):.spec.ports[].port'"
   FZF_DEFAULT_COMMAND="kubectl get svc -A || $UNPRIVILEGED" \
@@ -28,7 +57,7 @@ function _fzf_kubectl_entry_svc(){
 }
 
 # TODO fix custom-columns data,age
-function _fzf_kubectl_entry_secret(){
+function _entry_secret(){
   UNPRIVILEGED="kubectl get secrets \
     -o=custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,TYPE:.type'"
   FZF_DEFAULT_COMMAND="kubectl get secrets -A 2>/dev/null || $UNPRIVILEGED" \
@@ -39,7 +68,7 @@ function _fzf_kubectl_entry_secret(){
     --height 60% \
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
     --header $'╱ Enter (base64 -d) ╱\n\n' \
-      --bind 'enter:execute(sh fzf_kubectl _fzf_kubectl_secret_decode {1},{2})+abort' \
+      --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _secret_decode {1},{2})+abort' \
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,50% \
     --preview 'kubectl get secret --namespace {1} {2} -o json | bat --wrap auto --style=numbers --color=always -l json' "$@"
@@ -48,7 +77,7 @@ function _fzf_kubectl_entry_secret(){
 # TODO fix custom-columns volume,capacity,access,age
 # VOLUME:.spec.resources.requests.storage,\
 # ACCESS MODES:.spec.accessModes[],\
-function _fzf_kubectl_entry_pvc() {
+function _entry_pvc() {
   UNPRIVILEGED="kubectl get pvc \
     -o=custom-columns='\
 NAMESPACE:.metadata.namespace,\
@@ -63,14 +92,14 @@ STORAGECLASS:spec.storageClassName'"
     --layout=reverse \
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
     --header $'| Enter (mount on temporary pod pvc-inspector) |\n\n' \
-		  --bind 'enter:execute(sh fzf_kubectl _fzf_kubectl_pvc_inspect {1},{2})+abort' "$@" \
+		  --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _pvc_inspect {1},{2})+abort' "$@" \
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,50% \
     --preview 'kubectl describe pvc --namespace {1} {2} | bat -l yaml' "$@" 
 }
 
-function _fzf_kubectl_entry_event(){
-  _fzf_kubectl_event_command | fzf \
+function _entry_event(){
+  _event_command | fzf \
     --height 99% \
     --header-lines=1 \
     --info=inline \
@@ -82,7 +111,7 @@ function _fzf_kubectl_entry_event(){
 }
 
 # TODO change preview position per binding
-function _fzf_kubectl_entry_pod() {
+function _entry_pod() {
   UNPRIVILEGED="kubectl get pod \
     -o=custom-columns='\
 NAMESPACE:.metadata.namespace,\
@@ -100,26 +129,26 @@ RESTARTS:.status.containerStatuses[].restartCount'"
     --info=inline \
     --layout=reverse \
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
-      --bind 'enter:execute(sh fzf_kubectl _fzf_kubectl_pod_exec {1},{2})+abort' \
-      --bind 'ctrl-f:execute(sh fzf_kubectl _fzf_kubectl_pod_logs {1} {2})+abort' \
-      --bind 'ctrl-r:execute(sh fzf_kubectl _fzf_kubectl_pod_restart_deploy {1} {2})+reload(kubectl get pod -A)' \
-      --bind 'ctrl-b:execute(sh fzf_kubectl _fzf_kubectl_pod_debug {1},{2})+clear-query+reload(sh fzf_kubectl _fzf_kubectl_tags_registry)' \
-      --bind 'ctrl-d:execute-multi(sh fzf_kubectl _fzf_kubectl_pod_delete {1} {2})+reload(kubectl get pod -A)' \
-        --bind 'ctrl-v:change-preview(sh fzf_kubectl _fzf_kubectl_preview_events {1},{2})' \
-        --bind 'ctrl-s:change-preview(sh fzf_kubectl _fzf_kubectl_preview_describe pod,{1},{2})' \
-        --bind 'ctrl-l:change-preview(sh fzf_kubectl _fzf_kubectl_preview_logs {1},{2})' \
-          --bind '?:preview(sh fzf_kubectl _fzf_kubectl_help_pod)' \
+      --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_exec {1},{2})+abort' \
+      --bind 'ctrl-f:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_logs {1} {2})+abort' \
+      --bind 'ctrl-r:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_restart_deploy {1} {2})+reload(kubectl get pod -A)' \
+      --bind 'ctrl-b:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_debug {1},{2})+clear-query+reload(sh ~/code/github/fzf_kubectl/fzf_kubectl _tags_registry)' \
+      --bind 'ctrl-d:execute-multi(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_delete {1} {2})+reload(kubectl get pod -A)' \
+        --bind 'ctrl-v:change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_events {1},{2})' \
+        --bind 'ctrl-s:change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_describe pod,{1},{2})' \
+        --bind 'ctrl-l:change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_logs {1},{2})' \
+          --bind '?:preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _help_pod)' \
           --bind '!:reload(kubectl get pod -A)' \
           --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,60% \
-    --preview 'sh fzf_kubectl _fzf_kubectl_help_pod'
+    --preview 'sh ~/code/github/fzf_kubectl/fzf_kubectl _help_pod'
 }
 
 #####################
 ### ACTION
 #####################
 
-function _fzf_kubectl_pvc_inspect(){
+function _pvc_inspect(){
   IFS=',' read -r -a array <<< "$@"
   cat <<EOF | kubectl apply -f -
     apiVersion: v1
@@ -148,13 +177,13 @@ EOF
 
 # TODO fix errors related to execute-multi
 # --bind 'ctrl-d:execute-multi(kubectl delete pod --namespace {1} {2} --force)+reload(kubectl get pod --all-namespaces)+abort' \
-function _fzf_kubectl_pod_delete(){
+function _pod_delete(){
   kubectl delete pod -n $@ --force
   sleep 10s
 }
 
 # NOTE using debug action here to reuse the --bind enter:
-function _fzf_kubectl_pod_exec(){
+function _pod_exec(){
   IFS=',' read -r -a array <<< "$@"
   export $(tmux showenv | grep '^FZF_KUBECTL_DEBUG')
   if [[ $FZF_KUBECTL_DEBUG ]]; then
@@ -169,19 +198,19 @@ function _fzf_kubectl_pod_exec(){
   tmux setenv -u FZF_KUBECTL_DEBUG
 }
 
-function _fzf_kubectl_pod_restart_deploy(){
+function _pod_restart_deploy(){
   tmux send-keys "$2"
   kubectl rollout restart deployment --namespace $1 $(echo $2 | rev | cut -f3- -d '-' | rev)
 }
 
-function _fzf_kubectl_pod_logs(){
+function _pod_logs(){
   DEPLOYMENT_NAME=$(kubectl get pod --namespace $@ -o json | jq -r ".metadata.ownerReferences[].name")
   tmux setenv FZF_KUBECTL_STERN $DEPLOYMENT_NAME
   tmux send-keys "stern $(tmux showenv | grep '^FZF_KUBECTL_STERN'| awk -F '=' '{print $2}') -n $1" Enter
 }
 
 # TODO change prompt to 'Enter: select image to debug {pod} -n {namespace}'
-function _fzf_kubectl_pod_debug(){
+function _pod_debug(){
   IFS=',' read -r -a array <<< "$@"
   tmux setenv FZF_KUBECTL_DEBUG true
   tmux setenv FZF_KUBECTL_DEBUG_NS "${array[0]}"
@@ -194,7 +223,7 @@ function _fzf_kubectl_pod_debug(){
 
 # TODO fix formatting of column items
 # awk '{\$4=\"\"; \$5 = \"\t\" \$5; \$1 = \"\t\" \$1; \$2 = \"\t\" \$2; \$3 = \"\t\" \$3; print \$0;}'
-function _fzf_kubectl_preview_events(){
+function _preview_events(){
   IFS=',' read -r -a array <<< "$@"
   kubectl get event --namespace "${array[0]}"  --field-selector involvedObject.name="${array[1]}"  | \
     sed -e "1s/LAST SEEN/SEEN/" | \
@@ -202,13 +231,13 @@ function _fzf_kubectl_preview_events(){
     tac | bat --plain --color=always -l fstab
 }
 
-function _fzf_kubectl_preview_describe(){
+function _preview_describe(){
   IFS=',' read -r -a array <<< "$@"
   kubectl describe "${array[0]}" "${array[2]}" --namespace "${array[1]}" | \
     bat --color=always -l yaml
 }
 
-function _fzf_kubectl_preview_logs(){
+function _preview_logs(){
   IFS=',' read -r -a array <<< "$@"
   kubectl logs --all-containers --tail=10000 --namespace ${array[0]} ${array[1]} | \
     tac
@@ -218,7 +247,7 @@ function _fzf_kubectl_preview_logs(){
 ### HELPERS
 #####################
 
-function _fzf_kubectl_event_command(){
+function _event_command(){
   UNPRIVILEGED="CMA0564-k8sqacl02"
   CURRENT_CONTEXT=$(kubectl config current-context | sed 's/-cluster$//')
   if [[ $CURRENT_CONTEXT == $UNPRIVILEGED ]]; then
@@ -229,7 +258,7 @@ function _fzf_kubectl_event_command(){
 }
 
 # TODO make this easier to write
-function _fzf_kubectl_help_pod(){
+function _help_pod(){
   echo '
     { "actions": 
       { 
@@ -250,7 +279,7 @@ function _fzf_kubectl_help_pod(){
 }
 
 # TODO should reuse this with fzf_images
-_fzf_kubectl_tags_registry(){
+_tags_registry(){
   FZF_IMAGES_TAGS_REGISTRY_DIR=/tmp/.fzf_images_cache
   FZF_IMAGES_TAGS_REGISTRY_FILE=$FZF_IMAGES_TAGS_REGISTRY_DIR/$REGISTRY
   mkdir -p $FZF_IMAGES_TAGS_REGISTRY_DIR
