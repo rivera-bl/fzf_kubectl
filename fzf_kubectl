@@ -24,7 +24,7 @@ function _menu(){
      func="_entry_event"
      ;;
   "pvc")
-     func="_entry_event"
+     func="_entry_pvc"
      ;;
   "secret")
      func="_entry_secret"
@@ -50,7 +50,7 @@ function _entry_svc(){
     --height 99% \
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
     --header $'╱ Enter (port forward) ╱\n\n' \
-      --bind 'enter:execute(tmux send-keys "kubectl port-forward -n {1} svc/{2} :" Enter)+abort' \
+      --bind 'enter:execute(kubectl port-forward -n {1} svc/{2} :)+abort' \
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,50% \
     --preview 'kubectl get svc --namespace {1} {2} -o yaml | bat -l yaml' "$@"
@@ -107,7 +107,7 @@ function _entry_event(){
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,50% \
-    --preview 'kubectl describe {4} | bat -l yaml'
+    --preview 'kubectl describe -n {1} {5} | bat -l yaml'
 }
 
 # TODO change preview position per binding
