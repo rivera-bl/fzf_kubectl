@@ -5,6 +5,7 @@ REGISTRY="$(awk -F '_' '{print $1}' <<< $AWS_PROFILE).dkr.ecr.$AWS_REGION.amazon
 
 # TODO add action secret_decode
 # TODO complete formating of custom-columns
+# binding to C - for moving preview down
 #####################
 ### ENTRY
 #####################
@@ -134,9 +135,9 @@ RESTARTS:.status.containerStatuses[].restartCount'"
       --bind 'ctrl-r:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_restart_deploy {1} {2})+reload(kubectl get pod -A)' \
       --bind 'ctrl-b:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_debug {1},{2})+clear-query+reload(sh ~/code/github/fzf_kubectl/fzf_kubectl _tags_registry)' \
       --bind 'ctrl-d:execute-multi(sh ~/code/github/fzf_kubectl/fzf_kubectl _pod_delete {1} {2})+reload(kubectl get pod -A)' \
-        --bind 'ctrl-v:change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_events {1},{2})' \
-        --bind 'ctrl-s:change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_describe pod,{1},{2})' \
-        --bind 'ctrl-l:change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_logs {1},{2})' \
+        --bind 'ctrl-v:change-preview-window(down,80%|)+change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_events {1},{2})' \
+        --bind 'ctrl-s:change-preview-window(right|)+change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_describe pod,{1},{2})' \
+        --bind 'ctrl-l:change-preview-window(down,80%|)+change-preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _preview_logs {1},{2})' \
           --bind '?:preview(sh ~/code/github/fzf_kubectl/fzf_kubectl _help_pod)' \
           --bind '!:reload(kubectl get pod -A)' \
           --bind 'ctrl-space:toggle-preview' \
