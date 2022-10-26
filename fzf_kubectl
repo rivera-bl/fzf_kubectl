@@ -158,6 +158,8 @@ function _pvc_inspect(){
       name: pvc-inspector
       namespace: ${array[0]} 
     spec:
+      securityContext:
+        fsGroup: 2000 
       containers:
       - image: busybox
         name: pvc-inspector
