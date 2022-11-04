@@ -89,22 +89,10 @@ function _entry_secret(){
     --height 60% \
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
     --header $'╱ Enter (base64 -d) ╱\n\n' \
-      --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _secret_decode {1},{2})+abort' \
+      --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _secret_decode {1},{2})' \
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,50% \
     --preview 'kubectl get secret --namespace {1} {2} -o json | bat --wrap auto --style=numbers --color=always -l json' "$@"
-}
-
-function _secret_decode(){
-  # a=("${(@f)$(kubectl get secret -n {1} {2} -o json | jq -r ".data | keys[]")}") && for i in "$a[@]"; do z=$i b+="$i: |\n $(kubectl get secret -n {1} {2} -o json | jq -r --arg z "${z}" "'".data[$z]"'" | base64 -d)\n"; done && echo $b | nvim -c ":g/^$/d" -c "set syntax=yaml" -c "setlocal buftype=nofile"' \
-  IFS=',' read -r -a array <<< "$@"
-  secret=$(kubectl get secret -n ${array[0]} ${array[1]} -o json | \
-    jq ".data")
-  secret_keys=$(jq -r "keys | @sh" <<< $secret | tr -d \')
-
-  while read line; do 
-    jq -r ".$line" <<< $secret
-  done <<< $secret_keys 
 }
 
 # TODO fix custom-columns volume,capacity,access,age
@@ -195,6 +183,20 @@ function _irsa_policies(){
 
   aws iam get-role-policy --role-name $role_name --policy-name $policy_name | \
     nvim -R -c "set syntax=json"
+}
+
+function _secret_decode(){
+  IFS=',' read -r -a array <<< "$@"
+  secret=$(kubectl get secret -n ${array[0]} ${array[1]} -o json | \
+    jq ".data")
+  secret_keys=$(jq -r "keys | @sh" <<< $secret | tr -d \' | tr ' ' '\n')
+
+  while read line; do
+    secret_decoded+="$line: |\n $(jq -r .\"$line\" <<< $secret | base64 -d)\n"
+  done <<< $secret_keys
+
+  printf "secret: ${array[1]}\nnamespace: ${array[0]}\n\n$secret_decoded" | \
+    nvim -c "set syntax=yaml" -c "setlocal buftype=nofile"
 }
 
 function _pvc_inspect(){
