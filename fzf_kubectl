@@ -12,7 +12,7 @@ REGISTRY="$(awk -F '_' '{print $1}' <<< $AWS_PROFILE).dkr.ecr.$AWS_REGION.amazon
 
 # TODO customize like fzf_images
 function _menu(){
-  vals=("pod" "service" "event" "pvc" "secret")
+  vals=("pod" "service" "event" "pvc" "secret" "irsa")
   selection=$(printf "%s\n" "${vals[@]}" | fzf-tmux -p)
   case $selection in
   "pod")
