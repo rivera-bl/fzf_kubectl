@@ -30,6 +30,9 @@ function _menu(){
   "secret")
      func="_entry_secret"
      ;;
+  "irsa")
+     func="_entry_irsa"
+     ;;
   esac
   if [ ! -z "$selection" ]; then
     export func=$func
@@ -37,6 +40,41 @@ function _menu(){
     tmux neww zsh -c "source ~/code/github/fzf_kubectl/fzf_kubectl; $func"
     unset func
   fi
+}
+
+# TODO enable for multiple policies attached to single role
+# TODO get trust-relationship
+function _irsa_policies(){
+  # get role_arn from serviceaccount json
+  IFS=',' read -r -a array <<< "$@"
+  role_arn=$(kubectl get sa -n ${array[0]} ${array[1]}  -o json | \
+    jq -r '.metadata.annotations."eks.amazonaws.com/role-arn"')
+  # get name from role_arn
+  role_name=$(awk -F '/' '{print $2}' <<< $role_arn)
+  policy_name=$(aws iam list-role-policies --role-name $role_name | \
+    jq -r '.PolicyNames[0]')
+
+  aws iam get-role-policy --role-name $role_name --policy-name $policy_name | \
+    nvim -R -c "set syntax=json"
+}
+
+# TODO show policy permissions on preview
+function _entry_irsa(){
+  UNPRIVILEGED="kubectl get serviceaccount"
+  FZF_DEFAULT_COMMAND="kubectl get serviceaccount -A 2>/dev/null || $UNPRIVILEGED" \
+  fzf \
+    --header-lines=1 \
+    --info=inline \
+    --layout=reverse \
+    --height 60% \
+    --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
+    --header $'╱ Enter (base64 -d) ╱\n\n' \
+      --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _secret_decode {1},{2})+abort' \
+      --bind 'ctrl-p:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _irsa_policies {1},{2})' \
+      --bind 'ctrl-e:execute(kubectl edit serviceaccount --namespace {1} {2})+abort' \
+      --bind 'ctrl-space:toggle-preview' \
+    --preview-window right,hidden,60% \
+    --preview 'kubectl get serviceaccount --namespace {1} {2} -o yaml | bat --wrap auto --style=numbers --color=always -l yaml' "$@"
 }
 
 # TODO fix custom-columns port,age
