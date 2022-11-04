@@ -42,23 +42,6 @@ function _menu(){
   fi
 }
 
-# TODO enable for multiple policies attached to single role
-# TODO get trust-relationship
-function _irsa_policies(){
-  # get role_arn from serviceaccount json
-  IFS=',' read -r -a array <<< "$@"
-  role_arn=$(kubectl get sa -n ${array[0]} ${array[1]}  -o json | \
-    jq -r '.metadata.annotations."eks.amazonaws.com/role-arn"')
-  # get name from role_arn
-  role_name=$(awk -F '/' '{print $2}' <<< $role_arn)
-  policy_name=$(aws iam list-role-policies --role-name $role_name | \
-    jq -r '.PolicyNames[0]')
-
-  aws iam get-role-policy --role-name $role_name --policy-name $policy_name | \
-    nvim -R -c "set syntax=json"
-}
-
-# TODO show policy permissions on preview
 function _entry_irsa(){
   UNPRIVILEGED="kubectl get serviceaccount"
   FZF_DEFAULT_COMMAND="kubectl get serviceaccount -A 2>/dev/null || $UNPRIVILEGED" \
@@ -68,9 +51,8 @@ function _entry_irsa(){
     --layout=reverse \
     --height 60% \
     --prompt "$(kubectl config current-context | sed 's/-cluster$//')> " \
-    --header $'╱ Enter (base64 -d) ╱\n\n' \
-      --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _secret_decode {1},{2})+abort' \
-      --bind 'ctrl-p:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _irsa_policies {1},{2})' \
+    --header $'╱ Enter (show policy attached to role) ╱\n\n' \
+      --bind 'enter:execute(sh ~/code/github/fzf_kubectl/fzf_kubectl _irsa_policies {1},{2})' \
       --bind 'ctrl-e:execute(kubectl edit serviceaccount --namespace {1} {2})+abort' \
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,60% \
@@ -111,6 +93,18 @@ function _entry_secret(){
       --bind 'ctrl-space:toggle-preview' \
     --preview-window right,hidden,50% \
     --preview 'kubectl get secret --namespace {1} {2} -o json | bat --wrap auto --style=numbers --color=always -l json' "$@"
+}
+
+function _secret_decode(){
+  # a=("${(@f)$(kubectl get secret -n {1} {2} -o json | jq -r ".data | keys[]")}") && for i in "$a[@]"; do z=$i b+="$i: |\n $(kubectl get secret -n {1} {2} -o json | jq -r --arg z "${z}" "'".data[$z]"'" | base64 -d)\n"; done && echo $b | nvim -c ":g/^$/d" -c "set syntax=yaml" -c "setlocal buftype=nofile"' \
+  IFS=',' read -r -a array <<< "$@"
+  secret=$(kubectl get secret -n ${array[0]} ${array[1]} -o json | \
+    jq ".data")
+  secret_keys=$(jq -r "keys | @sh" <<< $secret | tr -d \')
+
+  while read line; do 
+    jq -r ".$line" <<< $secret
+  done <<< $secret_keys 
 }
 
 # TODO fix custom-columns volume,capacity,access,age
@@ -186,6 +180,22 @@ RESTARTS:.status.containerStatuses[].restartCount'"
 #####################
 ### ACTION
 #####################
+
+# TODO enable for multiple policies attached to single role
+# TODO get trust-relationship
+function _irsa_policies(){
+  # get role_arn from serviceaccount json
+  IFS=',' read -r -a array <<< "$@"
+  role_arn=$(kubectl get sa -n ${array[0]} ${array[1]}  -o json | \
+    jq -r '.metadata.annotations."eks.amazonaws.com/role-arn"')
+  # get name from role_arn
+  role_name=$(awk -F '/' '{print $2}' <<< $role_arn)
+  policy_name=$(aws iam list-role-policies --role-name $role_name | \
+    jq -r '.PolicyNames[0]')
+
+  aws iam get-role-policy --role-name $role_name --policy-name $policy_name | \
+    nvim -R -c "set syntax=json"
+}
 
 function _pvc_inspect(){
   IFS=',' read -r -a array <<< "$@"
